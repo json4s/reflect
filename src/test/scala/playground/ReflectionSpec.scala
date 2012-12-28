@@ -25,6 +25,10 @@ case class OtherRecord(id: Int, data: String, createdAt: Date = new Date) {
   def this() = this(0, "")
 }
 case class PersonWithThing(name: String, age: Int, thing: Thing)
+case class OptionTester(name:String, age:Option[Int])
+case class OptionThing(name:String, thing:Option[Thing])
+case class ListWithStrings(things: List[String])
+case class ListWithThings(name: String, things: List[Thing])
 
 class ReflectionSpec extends Specification {
 
@@ -103,10 +107,11 @@ class ReflectionSpec extends Specification {
       val actual = bound.asInstanceOf[PersonWithThing]
       actual.name must_== expected.name
       actual.age must_== expected.age
-//      actual.thing must beNull
       actual.thing.name must_== expected.thing.name
       actual.thing.age must_== expected.thing.age
     }
+
+
 
   }
 
