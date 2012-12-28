@@ -16,6 +16,20 @@ class MutablePerson {
   }
 }
 
+class MutablePersonWithThing {
+  var name: String = _
+  var age: Int = _
+  var dateOfBirth: Date = _
+  var thing: Thing = _
+
+  override def toString() = "MutablePerson(name: %s, age: %d, dateOfBirth: %s, thing: %s)".format(name, age, dateOfBirth, thing)
+
+  override def equals(obj: Any): Boolean = obj match {
+    case o: MutablePerson => name == o.name && age == o.age && dateOfBirth == o.dateOfBirth
+    case _ => false
+  }
+}
+
 case class Person(name: String, age: Int, dateOfBirth: Date)
 case class Thing(name: String, age: Int, dateOfBirth: Option[Date], createdAt: Date = new Date)
 case class AnotherThing(name: String, dateOfBirth: Option[Date], age: Int, createdAt: Date = new Date)
@@ -32,7 +46,29 @@ case class ListWithThings(name: String, things: List[Thing])
 
 class ReflectionSpec extends Specification {
 
+  sequential
   "Reflective access" should {
+
+    "create an option thing when thing is provided" in {
+      val cal = Calendar.getInstance()
+      cal.set(cal.get(Calendar.YEAR) - 33, 1, 1, 0, 0, 0)
+      val thing = Thing("antenna", 1, Some(cal.getTime))
+      val expected = OptionThing("radio", Some(thing))
+      val data = Map(
+        "name" -> expected.name,
+        "thing.name" -> thing.name,
+        "thing.age" -> thing.age,
+        "thing.dateOfBirth" -> thing.dateOfBirth.get,
+        "thing.createdAt" -> thing.createdAt)
+      val actual = Reflective.bind[OptionThing](data)
+      actual must_== expected
+    }
+
+    "create an option thing when thing is NOT provided" in {
+      val expected = OptionThing("phone", None)
+      val actual = Reflective.bind[OptionThing](Map("name" -> expected.name))
+      actual must_== expected
+    }
 
     "create a person when all the fields are provided" in {
       val cal = Calendar.getInstance()
@@ -112,6 +148,29 @@ class ReflectionSpec extends Specification {
     }
 
 
+    "create a mutable person with thing when the necessary data is provided" in {
+      val cal = Calendar.getInstance()
+      cal.set(cal.get(Calendar.YEAR) - 33, 1, 1, 0, 0, 0)
+      val expected = new MutablePersonWithThing
+      expected.name = "tommy"
+      expected.age = 26
+      expected.dateOfBirth = cal.getTime
+      expected.thing = Thing("tommy's thing", 1, None)
+      val data = Map("name" -> "tommy", "age" -> 26, "dateOfBirth" -> cal.getTime, "thing.name" -> "tommy's thing", "thing.age" -> 1)
+      val bound = Reflective.bindType(typeOf[MutablePersonWithThing], data)
+      val actual = bound.asInstanceOf[MutablePersonWithThing]
+      actual.name must_== expected.name
+      actual.age must_== expected.age
+      actual.dateOfBirth must_== expected.dateOfBirth
+      actual.thing.name must_== expected.thing.name
+      actual.thing.age must_== expected.thing.age
+    }
+
+    "create an option tester when optional data is available" in {
+      val expected = OptionTester("halo", Some(3))
+      val actual = Reflective.bind[OptionTester](Map("name" -> expected.name, "age" -> 3))
+      actual must_== expected
+    }
 
   }
 

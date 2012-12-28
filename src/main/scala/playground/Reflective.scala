@@ -23,24 +23,22 @@ object Reflective {
 
     def valueFor(sym: (Symbol, Int)) = {
       val decName = sym._1.name.decoded.trim
-      if (values.isComplex(decName)) {
-        (bindType(sym._1.typeSignature, values.forPrefix(decName)), sym._2)
-      }
-      else (values(decName), sym._2)
+      val tpe = sym._1.typeSignature
+      (readRequired(values, decName, tpe), sym._2)
     }
 
-    def optionalValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim), sym._2)
+    def optionalValueFor(sym: (Symbol, Int)) = (readOptional(values, sym._1.name.decoded.trim, Meta.optionType(sym._1.typeSignature)), sym._2)
 
-    def defaultValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim) getOrElse {
+    def defaultValueFor(sym: (Symbol, Int)) = (readDefault(values, sym._1.name.decoded.trim, sym._1.typeSignature) {
       val ts = im.symbol.typeSignature
       val defarg = ts member newTermName(s"apply$$default$$${sym._2+1}")
       if (defarg != NoSymbol) {
         (im reflectMethod defarg.asMethod)()
       } else
-        throw new IllegalArgumentException(s"${sym._1.name.decoded}: ${sym._1.typeSignature.toString}")
+        throw new IllegalArgumentException(s"${sym._1.name.decoded.trim}: ${sym._1.typeSignature.toString}")
     }, sym._2)
 
-    val remainingValues = values -- ctorParams.map(_.name.decoded)
+    val remainingValues = values -- ctorParams.map(_.name.decoded.trim)
     val toset = (required map valueFor) ::: (options map optionalValueFor) ::: (defaults map defaultValueFor)
     val obj = klazz.reflectConstructor(ctor)(toset.sortBy(_._2).map(_._1):_*)
     setFields(obj, remainingValues)
@@ -51,7 +49,7 @@ object Reflective {
     val zipped  = ctors zip (ctors map (ctor => pickConstructorArgs(ctor.paramss, argNames)))
     zipped collectFirst {
       case (m: MethodSymbol, Some(args)) => (m, args)
-    } getOrElse (throw new RuntimeException(s"Couldn't find a constructor for ${clazz.name.decoded} and args: [${argNames.mkString(", ")}]"))
+    } getOrElse (throw new RuntimeException(s"Couldn't find a constructor for ${clazz.name.decoded.trim} and args: [${argNames.mkString(", ")}]"))
   }
 
   private[this] def pickConstructorArgs(candidates: List[List[Symbol]], argNames: Set[String]): Option[List[Symbol]] = {
@@ -62,11 +60,10 @@ object Reflective {
     }
     def matchingRequired(plist: List[Symbol]) = {
       val required = plist filter isRequired
-      required.size <= argNames.size && required.forall(s => argNames.contains(s.name.decoded))
+      required.size <= argNames.size && required.forall(s => argNames.contains(s.name.decoded.trim))
     }
     ctors find matchingRequired
   }
-
 
   def getFields[T](obj: T)(implicit mf: ClassTag[T]): Seq[(String, Any)] = {
     val im = cm.reflect(obj)
@@ -78,13 +75,34 @@ object Reflective {
     } yield (decl.name.decoded.trim, fm.get)).toSeq
   }
 
+  def readRequired[S](values: ValueProvider[S], name: String, tpe: Type): Any = {
+    if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
+      bindType(tpe, values.forPrefix(name))
+    }
+    else values(name)
+  }
+
+  def readOptional[S](values: ValueProvider[S], name: String, tpe: Type): Option[Any] = {
+    if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
+      Some(bindType(tpe, values.forPrefix(name)))
+    }
+    else values.get(name)
+  }
+
+  def readDefault[S](values: ValueProvider[S], name: String, tpe: Type)(defaultValue: => Any) = {
+    if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
+      bindType(tpe, values.forPrefix(name))
+    }
+    else values.get(name) getOrElse defaultValue
+  }
+
   def setFields[S, T : ClassTag](obj: T, values: ValueProvider[S]): T = {
     val im = cm.reflect(obj)
     val ms = im.symbol
 
     ms.typeSignature.declarations.map(_.asTerm).filter(_.isVar) foreach { f =>
       val fm = im.reflectField(f)
-      values get f.name.decoded.trim foreach fm.set
+      fm set readRequired(values, f.name.decoded.trim, f.typeSignature)
     }
     obj
   }
