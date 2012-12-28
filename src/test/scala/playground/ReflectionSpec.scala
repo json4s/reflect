@@ -2,6 +2,7 @@ package playground
 
 import org.specs2.mutable.Specification
 import java.util.{Calendar, Date}
+import scala.reflect.runtime.universe._
 
 class MutablePerson {
   var name: String = _
@@ -44,7 +45,7 @@ class ReflectionSpec extends Specification {
       expected.name = "Timmy"
       expected.age = 33
       expected.dateOfBirth = cal.getTime
-      val res = Reflective.bind[MutablePerson](Map("name" -> "Timmy", "age" -> 33, "dateOfBirth" -> cal.getTime))
+      val res = Reflective.bindType(typeOf[MutablePerson], Map("name" -> "Timmy", "age" -> 33, "dateOfBirth" -> cal.getTime))
       res must_== expected
     }
 
@@ -91,19 +92,20 @@ class ReflectionSpec extends Specification {
 
     "create an other record when only id is provided" in {
       val expected = new OtherRecord(303)
-      val actual = Reflective.bind[OtherRecord](Map("id" -> 303))
+      val actual = Reflective.bind[OtherRecord]( Map("id" -> 303))
       actual.id must_== expected.id
       actual.data must_== expected.data
     }
 
     "create a person with thing when the necessary data is provided" in {
       val expected = PersonWithThing("tommy", 26, Thing("tommy's thing", 1, None))
-      val actual = Reflective.bind[PersonWithThing](Map("name" -> "tommy", "age" -> 26, "thing.name" -> "tommy's thing", "thing.age" -> 1))
+      val bound = Reflective.bindType(typeOf[PersonWithThing], Map("name" -> "tommy", "age" -> 26, "thing.name" -> "tommy's thing", "thing.age" -> 1))
+      val actual = bound.asInstanceOf[PersonWithThing]
       actual.name must_== expected.name
       actual.age must_== expected.age
-      actual.thing must beNull
-//      actual.thing.name must_== expected.thing.name
-//      actual.thing.age must_== expected.thing.age
+//      actual.thing must beNull
+      actual.thing.name must_== expected.thing.name
+      actual.thing.age must_== expected.thing.age
     }
 
   }
