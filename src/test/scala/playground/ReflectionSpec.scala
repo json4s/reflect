@@ -16,6 +16,18 @@ class MutablePerson {
   }
 }
 
+class MutablePersonWithSimpleThing {
+  var thing: SimpleThing = _
+  var age: Int = _
+  
+  override def toString() = s"MutablePersonWithSimple(thing: $thing, age: $age)"
+  override def equals(obj: Any): Boolean = obj match {
+    case o: MutablePersonWithSimpleThing => age == o.age && thing == o.thing
+	case _ => false
+  }
+}
+
+case class SimpleThing(name:String, age:Int)
 case class Person(name: String, age: Int, dateOfBirth: Date)
 case class Thing(name: String, age: Int, dateOfBirth: Option[Date], createdAt: Date = new Date)
 case class AnotherThing(name: String, dateOfBirth: Option[Date], age: Int, createdAt: Date = new Date)
@@ -60,10 +72,33 @@ class ReflectionSpec extends Specification {
 	  res.age must_== expected.age
 	  res.dateOfBirth.toString must_== expected.dateOfBirth.toString
     }
+	
+	"create a mutable person with a SimpleThing provided" in {
+	  val expected = new MutablePersonWithSimpleThing
+	  
+	  expected.age = 11
+	  expected.thing = SimpleThing("Thinger",21)
+	  val params = Map("age"->expected.age.toString,
+	                   "thing.name"->expected.thing.name.toString,
+					   "thing.age"->expected.thing.age.toString)
+	  val result = Reflective.bind[MutablePersonWithSimpleThing](params)
+	  
+	  expected must_== result
+	}
+	
+	"create a mutable person without a SimpleThing" in {
+	  val expected = new MutablePersonWithSimpleThing
+	  
+	  expected.age = 11
+	  val params = Map("age"->expected.age.toString)
+	  val result = Reflective.bind[MutablePersonWithSimpleThing](params)
+	  
+	  expected must_== result
+	}
 
     "create a record when all the fields are provided" in {
       val expected = record(225)
-      val res = Reflective.bind[Record](Map("id" -> expected.id, "data" -> expected.data, "createdAt" -> expected.createdAt))
+      val res = Reflective.bind[Record](Map("id" -> expected.id.toString, "data" -> expected.data.toString, "createdAt" -> expected.createdAt.toString))
       res.id must_== expected.id
 	  res.data must_== expected.data
 	  res.createdAt.toString must_== expected.createdAt.toString
@@ -83,7 +118,7 @@ class ReflectionSpec extends Specification {
       actual.age must_== expected.age
       actual.dateOfBirth must beNone
     }
-
+	
     "create a thing when all fields are provided" in {
       val cal = Calendar.getInstance()
       cal.set(cal.get(Calendar.YEAR) - 2, 1, 1, 0, 0, 0)

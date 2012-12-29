@@ -34,6 +34,7 @@ object Reflective {
       else (castPrimativeTypeFromString(sym._1,values(decName).toString), sym._2)
     }
 	// Also here need to make sure it conforms to the type
+	// need to be able to handle complex objects as well...
     def optionalValueFor(sym: (Symbol, Int)) = {
 		(values.get(sym._1.name.decoded.trim) map {
 			v => castPrimativeTypeFromString(sym._1,v.toString)
@@ -98,13 +99,22 @@ object Reflective {
   def setFields[S, T : ClassTag](obj: T, values: ValueProvider[S]): T = {
     val im = cm.reflect(obj)
     val ms = im.symbol
-
+	
     ms.typeSignature.declarations.filter(_.asTerm.isVar) foreach { s =>
+	
+	  val decName = s.name.decoded.trim
 	  val f = s.asTerm
       val fm = im.reflectField(f)
-      values get f.name.decoded.trim map{ x =>
-	    castPrimativeTypeFromString(s,x.toString)
-	  } foreach fm.set
+	  
+      if (values.isComplex(decName)) {
+	    try {
+          fm.set(bindType(s.typeSignature, values.forPrefix(decName)))
+		} catch { case _: Throwable => /* If cant set field, don't set field! */}
+      } else {
+        values get f.name.decoded.trim map{ x =>
+	      castPrimativeTypeFromString(s,x.toString)
+	    } foreach fm.set
+      }
     }
     obj
   }

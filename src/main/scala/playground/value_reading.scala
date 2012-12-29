@@ -18,6 +18,8 @@ trait ValueProvider[S]  {
 
 class MapValueReader(protected val data: Map[String, Any], val prefix: String = "", val separator: Separator = DotSeparator) extends ValueProvider[Map[String, Any]] {
 
+  override def toString = data.toString
+
   def read(key: String): Either[Throwable, Option[Any]] = allCatch either { data get separator.wrap(key, prefix) }
 
   def forPrefix(key: String): ValueProvider[Map[String, Any]] = new MapValueReader(data, separator.wrap(key), separator)
