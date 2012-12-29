@@ -82,7 +82,7 @@ object Reflective {
     ctors find matchingRequired
   }
 
-
+	// This appears to never be called...
   def getFields[T](obj: T)(implicit mf: ClassTag[T]): Seq[(String, Any)] = {
     val im = cm.reflect(obj)
     val ms = im.symbol

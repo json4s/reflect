@@ -36,12 +36,16 @@ class ReflectionSpec extends Specification {
 
   "Reflective access" should {
 
+	// These are not working because java == on Dates just checks that they are the
+	// same instance.
     "create a person when all the fields are provided" in {
       val cal = Calendar.getInstance()
       cal.set(cal.get(Calendar.YEAR) - 33, 1, 1, 0, 0, 0)
       val expected = Person("Timmy", 33, cal.getTime)
       val res = Reflective.bind[Person](Map("name" -> "Timmy", "age" -> "33", "dateOfBirth" -> cal.getTime.toString))
-      res must_== expected
+      res.name must_== expected.name
+	  res.age must_== expected.age
+	  res.dateOfBirth.toString must_== expected.dateOfBirth.toString
     }
 
     "create a mutable person when all the fields are provided" in {
@@ -51,14 +55,18 @@ class ReflectionSpec extends Specification {
       expected.name = "Timmy"
       expected.age = 33
       expected.dateOfBirth = cal.getTime
-      val res = Reflective.bindType(typeOf[MutablePerson], Map("name" -> "Timmy", "age" -> "33", "dateOfBirth" -> cal.getTime))
-      res must_== expected
+      val res = Reflective.bind[MutablePerson]( Map("name" -> "Timmy", "age" -> "33", "dateOfBirth" -> cal.getTime.toString))
+      res.name must_== expected.name
+	  res.age must_== expected.age
+	  res.dateOfBirth.toString must_== expected.dateOfBirth.toString
     }
 
     "create a record when all the fields are provided" in {
       val expected = record(225)
       val res = Reflective.bind[Record](Map("id" -> expected.id, "data" -> expected.data, "createdAt" -> expected.createdAt))
-      res must_== expected
+      res.id must_== expected.id
+	  res.data must_== expected.data
+	  res.createdAt.toString must_== expected.createdAt.toString
     }
 
     "create a record when createdAt is not provided" in {
