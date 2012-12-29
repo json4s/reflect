@@ -1,5 +1,6 @@
 package object playground {
 
+  implicit val defaultDateFormat = new java.text.SimpleDateFormat("EEE MMM d HH:mm:ss zzz yyyy")
   implicit def map2valueProvider(m: Map[String, Any]): ValueProvider[Map[String, Any]] = new MapValueReader(m)
 
   object PassThroughSeparator extends Separator("", "")

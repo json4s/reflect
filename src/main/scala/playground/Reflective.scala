@@ -9,9 +9,11 @@ import java.text.SimpleDateFormat
 
 object Reflective {
 
-  def bind[T](values: ValueProvider[_])(implicit ct: TypeTag[T]): T = bindType(ct.tpe, values).asInstanceOf[T]
+  def bind[T](values: ValueProvider[_])(implicit ct: TypeTag[T]): T = synchronized {
+    bindType(ct.tpe, values).asInstanceOf[T]
+  }
 
-  def bindType(tpe: Type, values: ValueProvider[_]): Any = synchronized {
+  def bindType(tpe: Type, values: ValueProvider[_]): Any = {
     val klazz = cm.reflectClass(tpe.typeSymbol.asClass)
     val csym = klazz.symbol
 
@@ -29,12 +31,9 @@ object Reflective {
       if (values.isComplex(decName)) {
         (bindType(sym._1.typeSignature, values.forPrefix(decName)), sym._2)
       }
-	  // Right here we need to inspect the type to make sure it conforms
-	  // have symbol, use typeSignature to get type
       else (castPrimativeTypeFromString(sym._1,values(decName).toString), sym._2)
     }
-	// Also here need to make sure it conforms to the type
-	// need to be able to handle complex objects as well...
+	
     def optionalValueFor(sym: (Symbol, Int)) = {
 		(values.get(sym._1.name.decoded.trim) map {
 			v => castPrimativeTypeFromString(sym._1,v.toString)
@@ -42,7 +41,6 @@ object Reflective {
 		, sym._2)
 	}
 	
-	// Here also we need to conform to the right type
     def defaultValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim).map{
 	    x=> castPrimativeTypeFromString(sym._1,x.toString)
 	  } getOrElse {
@@ -56,9 +54,7 @@ object Reflective {
 
     val remainingValues = values -- ctorParams.map(_.name.decoded)
     val toset = (required map valueFor) ::: (options map optionalValueFor) ::: (defaults map defaultValueFor)
-	// Initialize the object
     val obj = klazz.reflectConstructor(ctor)(toset.sortBy(_._2).map(_._1):_*)
-	// Set any remaining fields here (Good for POJO type DTOS)
     setFields(obj, remainingValues)
   }
 
@@ -83,7 +79,7 @@ object Reflective {
     ctors find matchingRequired
   }
 
-	// This appears to never be called...
+	/* This appears to never be called...
   def getFields[T](obj: T)(implicit mf: ClassTag[T]): Seq[(String, Any)] = {
     val im = cm.reflect(obj)
     val ms = im.symbol
@@ -93,6 +89,7 @@ object Reflective {
       fm = im.reflectField(decl)
     } yield (decl.name.decoded.trim, fm.get)).toSeq
   }
+  */
 
   // Sets the fields of non constructor args have access to the symbol as well
   // this doesn't look like it can handle non simple fields
@@ -123,8 +120,7 @@ object Reflective {
   
   // This could be placed in the ValueProvider trait, but then it will require the passing
   // of the Symbol or Type for every accessor method (get, read, apply, etc...)
-  implicit val defaultDateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss zzz yyyy")
-  
+  // a default implicit SimpleDateFormat is cound in the package object
   def castPrimativeTypeFromString(sym:Symbol,value:String)(implicit dformatter: SimpleDateFormat):Any = {
     val tpe:Type = sym.typeSignature
     tpe match {

@@ -44,7 +44,7 @@ case class ListWithThings(name: String, things: List[Thing])
 
 class ReflectionSpec extends Specification {
 
-   sequential
+   //sequential
 
   "Reflective access" should {
 
