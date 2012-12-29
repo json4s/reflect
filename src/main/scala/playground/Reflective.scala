@@ -4,6 +4,9 @@ import scala.reflect.runtime.{currentMirror => cm, universe}
 import scala.reflect.runtime.universe._
 import scala.reflect._
 
+import java.util.Date
+import java.text.SimpleDateFormat
+
 object Reflective {
 
   def bind[T](values: ValueProvider[_])(implicit ct: TypeTag[T]): T = bindType(ct.tpe, values).asInstanceOf[T]
@@ -16,22 +19,32 @@ object Reflective {
       val modul = csym.companionSymbol.asModule
       cm reflect (cm reflectModule modul).instance
     } else null
-
+	
     val (ctor, ctorParams) = pickConstructor(csym, values.keySet)
     val (defaults, probablyRequired) = ctorParams.zipWithIndex partition (_._1.asTerm.isParamWithDefault)
-    val (options, required) = probablyRequired partition (s => s._1.asTerm.typeSignature <:< typeOf[Option[_]])
+    val (options, required) = probablyRequired partition (s => s._1.asTerm.typeSignature <:< typeOf[Option[_]]) 
 
     def valueFor(sym: (Symbol, Int)) = {
       val decName = sym._1.name.decoded.trim
       if (values.isComplex(decName)) {
         (bindType(sym._1.typeSignature, values.forPrefix(decName)), sym._2)
       }
-      else (values(decName), sym._2)
+	  // Right here we need to inspect the type to make sure it conforms
+	  // have symbol, use typeSignature to get type
+      else (castPrimativeTypeFromString(sym._1,values(decName).toString), sym._2)
     }
-
-    def optionalValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim), sym._2)
-
-    def defaultValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim) getOrElse {
+	// Also here need to make sure it conforms to the type
+    def optionalValueFor(sym: (Symbol, Int)) = {
+		(values.get(sym._1.name.decoded.trim) map {
+			v => castPrimativeTypeFromString(sym._1,v.toString)
+		}
+		, sym._2)
+	}
+	
+	// Here also we need to conform to the right type
+    def defaultValueFor(sym: (Symbol, Int)) = (values.get(sym._1.name.decoded.trim).map{
+	    x=> castPrimativeTypeFromString(sym._1,x.toString)
+	  } getOrElse {
       val ts = im.symbol.typeSignature
       val defarg = ts member newTermName(s"apply$$default$$${sym._2+1}")
       if (defarg != NoSymbol) {
@@ -42,7 +55,9 @@ object Reflective {
 
     val remainingValues = values -- ctorParams.map(_.name.decoded)
     val toset = (required map valueFor) ::: (options map optionalValueFor) ::: (defaults map defaultValueFor)
+	// Initialize the object
     val obj = klazz.reflectConstructor(ctor)(toset.sortBy(_._2).map(_._1):_*)
+	// Set any remaining fields here (Good for POJO type DTOS)
     setFields(obj, remainingValues)
   }
 
@@ -78,14 +93,41 @@ object Reflective {
     } yield (decl.name.decoded.trim, fm.get)).toSeq
   }
 
+  // Sets the fields of non constructor args have access to the symbol as well
+  // this doesn't look like it can handle non simple fields
   def setFields[S, T : ClassTag](obj: T, values: ValueProvider[S]): T = {
     val im = cm.reflect(obj)
     val ms = im.symbol
 
-    ms.typeSignature.declarations.map(_.asTerm).filter(_.isVar) foreach { f =>
+    ms.typeSignature.declarations.filter(_.asTerm.isVar) foreach { s =>
+	  val f = s.asTerm
       val fm = im.reflectField(f)
-      values get f.name.decoded.trim foreach fm.set
+      values get f.name.decoded.trim map{ x =>
+	    castPrimativeTypeFromString(s,x.toString)
+	  } foreach fm.set
     }
     obj
+  }
+  
+  def someString(in:Some[Any]) = in.map{x=>x.toString}
+  
+  // This could be placed in the ValueProvider trait, but then it will require the passing
+  // of the Symbol or Type for every accessor method (get, read, apply, etc...)
+  implicit val defaultDateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss zzz yyyy")
+  
+  def castPrimativeTypeFromString(sym:Symbol,value:String)(implicit dformatter: SimpleDateFormat):Any = {
+    val tpe:Type = sym.typeSignature
+    tpe match {
+	    case tpe if tpe =:= typeOf[Int] => { value.toInt }
+	    case tpe if tpe =:= typeOf[Long] => { value.toLong }
+		case tpe if tpe =:= typeOf[Float] => { value.toFloat }
+		case tpe if tpe =:= typeOf[Double] => { value.toDouble }
+	    case tpe if tpe =:= typeOf[String] => { value }
+		case tpe if tpe =:= typeOf[Date] => { dformatter.parse(value) }
+	    case _ => { 
+			println(s"Error: ${tpe} Not primative type! Value:\n ${value}")
+			None 
+		}
+	  }
   }
 }

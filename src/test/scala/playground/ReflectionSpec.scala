@@ -32,13 +32,15 @@ case class ListWithThings(name: String, things: List[Thing])
 
 class ReflectionSpec extends Specification {
 
+   sequential
+
   "Reflective access" should {
 
     "create a person when all the fields are provided" in {
       val cal = Calendar.getInstance()
       cal.set(cal.get(Calendar.YEAR) - 33, 1, 1, 0, 0, 0)
       val expected = Person("Timmy", 33, cal.getTime)
-      val res = Reflective.bind[Person](Map("name" -> "Timmy", "age" -> 33, "dateOfBirth" -> cal.getTime))
+      val res = Reflective.bind[Person](Map("name" -> "Timmy", "age" -> "33", "dateOfBirth" -> cal.getTime.toString))
       res must_== expected
     }
 
@@ -49,7 +51,7 @@ class ReflectionSpec extends Specification {
       expected.name = "Timmy"
       expected.age = 33
       expected.dateOfBirth = cal.getTime
-      val res = Reflective.bindType(typeOf[MutablePerson], Map("name" -> "Timmy", "age" -> 33, "dateOfBirth" -> cal.getTime))
+      val res = Reflective.bindType(typeOf[MutablePerson], Map("name" -> "Timmy", "age" -> "33", "dateOfBirth" -> cal.getTime))
       res must_== expected
     }
 
@@ -61,14 +63,14 @@ class ReflectionSpec extends Specification {
 
     "create a record when createdAt is not provided" in {
       val expected = record(225)
-      val actual = Reflective.bind[Record](Map("id" -> expected.id, "data" -> expected.data))
+      val actual = Reflective.bind[Record](Map("id" -> expected.id.toString, "data" -> expected.data.toString))
       actual.id must_== expected.id
       actual.data must_== expected.data
     }
 
     "create a thing when only name and age are provided" in {
       val expected = Thing("a thing", 2, None)
-      val actual = Reflective.bind[Thing](Map("name" -> expected.name, "age" -> expected.age))
+      val actual = Reflective.bind[Thing](Map("name" -> expected.name.toString, "age" -> expected.age.toString))
       actual.name must_== expected.name
       actual.age must_== expected.age
       actual.dateOfBirth must beNone
@@ -79,7 +81,7 @@ class ReflectionSpec extends Specification {
       cal.set(cal.get(Calendar.YEAR) - 2, 1, 1, 0, 0, 0)
       val createdAt = new Date
       val expected = Thing("a thing", 2, None)
-      val actual = Reflective.bind[Thing](Map("name" -> expected.name, "age" -> expected.age, "dateOfBirth" -> cal.getTime, "createdAt" -> createdAt))
+      val actual = Reflective.bind[Thing](Map("name" -> expected.name.toString, "age" -> expected.age.toString, "dateOfBirth" -> cal.getTime, "createdAt" -> createdAt.toString))
       actual.name must_== expected.name
       actual.age must_== expected.age
       actual.dateOfBirth must beSome(cal.getTime)
@@ -88,7 +90,7 @@ class ReflectionSpec extends Specification {
 
     "create another thing when only name and age are provided" in {
       val expected = AnotherThing("another thing", None, 2)
-      val actual = Reflective.bind[AnotherThing](Map("name" -> expected.name, "age" -> expected.age))
+      val actual = Reflective.bind[AnotherThing](Map("name" -> expected.name.toString, "age" -> expected.age.toString))
       actual.name must_== expected.name
       actual.age must_== expected.age
       actual.dateOfBirth must beNone
@@ -96,22 +98,20 @@ class ReflectionSpec extends Specification {
 
     "create an other record when only id is provided" in {
       val expected = new OtherRecord(303)
-      val actual = Reflective.bind[OtherRecord]( Map("id" -> 303))
+      val actual = Reflective.bind[OtherRecord]( Map("id" -> "303"))
       actual.id must_== expected.id
       actual.data must_== expected.data
     }
 
     "create a person with thing when the necessary data is provided" in {
       val expected = PersonWithThing("tommy", 26, Thing("tommy's thing", 1, None))
-      val bound = Reflective.bindType(typeOf[PersonWithThing], Map("name" -> "tommy", "age" -> 26, "thing.name" -> "tommy's thing", "thing.age" -> 1))
+      val bound = Reflective.bindType(typeOf[PersonWithThing], Map("name" -> "tommy", "age" -> "26", "thing.name" -> "tommy's thing", "thing.age" -> "1"))
       val actual = bound.asInstanceOf[PersonWithThing]
       actual.name must_== expected.name
       actual.age must_== expected.age
       actual.thing.name must_== expected.thing.name
       actual.thing.age must_== expected.thing.age
     }
-
-
 
   }
 
