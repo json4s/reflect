@@ -22,12 +22,30 @@ class MutablePersonWithThing {
   var dateOfBirth: Date = _
   var thing: Thing = _
 
-  override def toString() = "MutablePerson(name: %s, age: %d, dateOfBirth: %s, thing: %s)".format(name, age, dateOfBirth, thing)
+  override def toString() = "MutablePersonWithThing(name: %s, age: %d, dateOfBirth: %s, thing: %s)".format(name, age, dateOfBirth, thing)
 
   override def equals(obj: Any): Boolean = obj match {
     case o: MutablePerson => name == o.name && age == o.age && dateOfBirth == o.dateOfBirth
     case _ => false
   }
+}
+
+class MutableTestWithDefault {
+  var name: String = _
+  var age: Int = 2
+  override def toString() = "MutableTestWithDefault(name: %s, age: %d)".format(name, age)
+}
+
+class MutableWithOption {
+  var name: String = _
+  var age: Option[Int] = None
+  override def toString() = "MutableWithOption(name: %s, age: %s)".format(name, age)
+}
+
+class MutableWithOptionThing {
+  var name: String = _
+  var thing: Option[Thing] = None
+  override def toString() = "MutableWithOptionThing(name: %s, thing: %s)".format(name, thing)
 }
 
 case class Person(name: String, age: Int, dateOfBirth: Date)
@@ -40,6 +58,7 @@ case class OtherRecord(id: Int, data: String, createdAt: Date = new Date) {
 }
 case class PersonWithThing(name: String, age: Int, thing: Thing)
 case class OptionTester(name:String, age:Option[Int])
+case class OptionWithDefaultTester(name: String, age: Option[Int] = Some(3))
 case class OptionThing(name:String, thing:Option[Thing])
 case class ListWithStrings(things: List[String])
 case class ListWithThings(name: String, things: List[Thing])
@@ -48,6 +67,56 @@ class ReflectionSpec extends Specification {
 
   sequential
   "Reflective access" should {
+
+    "bind a mutable option with thing" in {
+      val cal = Calendar.getInstance()
+      cal.set(cal.get(Calendar.YEAR) - 33, 1, 1, 0, 0, 0)
+      val thing = Thing("antenna", 1, Some(cal.getTime))
+      val expected = new MutableWithOptionThing
+      expected.name = "radio"
+      expected.thing = Some(thing)
+      val data = Map(
+        "name" -> expected.name,
+        "thing.name" -> thing.name,
+        "thing.age" -> thing.age,
+        "thing.dateOfBirth" -> thing.dateOfBirth.get,
+        "thing.createdAt" -> thing.createdAt)
+      val actual = Reflective.bind[MutableWithOptionThing](data)
+      actual.name must_== expected.name
+      actual.thing must_== expected.thing
+    }
+
+    "use the value provided for an option on a mutable field" in {
+      val expected = new MutableWithOption
+      expected.name = "mutaphone"
+      expected.age = Some(5)
+      val actual = Reflective.bind[MutableWithOption](Map("name" -> expected.name, "age" -> expected.age.get))
+      actual.name must_== expected.name
+      actual.age must_== expected.age
+    }
+
+    "use the default value for a mutable field" in {
+      val expected = new MutableTestWithDefault
+      expected.name = "mutaphone"
+      val actual = Reflective.bind[MutableTestWithDefault](Map("name" -> expected.name))
+      actual.name must_== expected.name
+      actual.age must_== expected.age
+    }
+
+    "set a value for a mutable field with a default value" in {
+      val expected = new MutableTestWithDefault
+      expected.name = "mutaphone"
+      expected.age = 5
+      val actual = Reflective.bind[MutableTestWithDefault](Map("name" -> expected.name, "age" -> expected.age))
+      actual.name must_== expected.name
+      actual.age must_== expected.age
+    }
+
+    "use the default value for an option when no value is provided" in {
+      val expected = OptionWithDefaultTester("cell")
+      val actual = Reflective.bind[OptionWithDefaultTester](Map("name" -> expected.name))
+      actual must_== expected
+    }
 
     "create an option thing when thing is provided" in {
       val cal = Calendar.getInstance()
@@ -140,6 +209,17 @@ class ReflectionSpec extends Specification {
     "create a person with thing when the necessary data is provided" in {
       val expected = PersonWithThing("tommy", 26, Thing("tommy's thing", 1, None))
       val bound = Reflective.bindType(typeOf[PersonWithThing], Map("name" -> "tommy", "age" -> 26, "thing.name" -> "tommy's thing", "thing.age" -> 1))
+      val actual = bound.asInstanceOf[PersonWithThing]
+      actual.name must_== expected.name
+      actual.age must_== expected.age
+      actual.thing.name must_== expected.thing.name
+      actual.thing.age must_== expected.thing.age
+    }
+
+    "create a person with thing when the necessary data is provided as an object" in {
+      val expected = PersonWithThing("tommy", 26, Thing("tommy's thing", 1, None))
+      val thing = Thing("tommy's thing", 1, None)
+      val bound = Reflective.bindType(typeOf[PersonWithThing], Map("name" -> "tommy", "age" -> 26, "thing" -> thing))
       val actual = bound.asInstanceOf[PersonWithThing]
       actual.name must_== expected.name
       actual.age must_== expected.age

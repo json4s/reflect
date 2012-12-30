@@ -75,25 +75,22 @@ object Reflective {
     } yield (decl.name.decoded.trim, fm.get)).toSeq
   }
 
-  def readRequired[S](values: ValueProvider[S], name: String, tpe: Type): Any = {
+  private[this] def readRequired[S](values: ValueProvider[S], name: String, tpe: Type): Any = {
     if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
       bindType(tpe, values.forPrefix(name))
-    }
-    else values(name)
+    } else values(name)
   }
 
-  def readOptional[S](values: ValueProvider[S], name: String, tpe: Type): Option[Any] = {
+  private[this] def readOptional[S](values: ValueProvider[S], name: String, tpe: Type): Option[Any] = {
     if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
       Some(bindType(tpe, values.forPrefix(name)))
-    }
-    else values.get(name)
+    } else values.get(name)
   }
 
-  def readDefault[S](values: ValueProvider[S], name: String, tpe: Type)(defaultValue: => Any) = {
+  private[this] def readDefault[S](values: ValueProvider[S], name: String, tpe: Type)(defaultValue: => Any) = {
     if (!Meta.isPrimitive(tpe) && values.isComplex(name)) {
       bindType(tpe, values.forPrefix(name))
-    }
-    else values.get(name) getOrElse defaultValue
+    } else values.get(name) getOrElse defaultValue
   }
 
   def setFields[S, T : ClassTag](obj: T, values: ValueProvider[S]): T = {
@@ -102,7 +99,11 @@ object Reflective {
 
     ms.typeSignature.declarations.map(_.asTerm).filter(_.isVar) foreach { f =>
       val fm = im.reflectField(f)
-      fm set readRequired(values, f.name.decoded.trim, f.typeSignature)
+      val nm = f.name.decoded.trim
+      if (f.typeSignature <:< typeOf[Option[_]])
+        fm set readOptional(values, nm, Meta.optionType(f.typeSignature))
+      else if (values contains nm)
+        fm set readRequired(values, nm, f.typeSignature)
     }
     obj
   }

@@ -3,8 +3,8 @@ package playground
 import org.specs2.mutable.Specification
 
 class SeparatorSpec extends Specification {
-  val dots = DotSeparator
-  val squareBrackets = SquareBracketsSeparator
+  val dots = by.Dots
+  val squareBrackets = by.SquareBrackets
   "A DotSeparator" should {
     "strip the separator from a key" in {
       dots.stripFirst(".hello") must_== "hello"
