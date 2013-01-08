@@ -25,7 +25,7 @@ class MapValueReader(protected val data: Map[String, Any], val prefix: String = 
 
   def read(key: String): Either[Throwable, Option[Any]] = allCatch either { data get separated.wrap(key, prefix) }
 
-  def forPrefix(key: String): ValueProvider[Map[String, Any]] = new MapValueReader(data, separated.wrap(key), separated)
+  def forPrefix(key: String): ValueProvider[Map[String, Any]] = new MapValueReader(data, separated.wrap(key, prefix), separated)
 
   lazy val values: Map[String, Any] = stripPrefix(data)
 
