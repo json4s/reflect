@@ -15,6 +15,7 @@ trait ValueProvider[S]  {
   def --(keys: Iterable[String]): ValueProvider[S]
   def isComplex(key: String): Boolean
   def contains(key: String): Boolean
+  def getUniquePrefixes: Set[String]
 }
 
 object MapValueReader {
@@ -22,7 +23,11 @@ object MapValueReader {
 }
 
 class MapValueReader(protected val data: Map[String, Any], val prefix: String = "", val separated: Separator = by.Dots) extends ValueProvider[Map[String, Any]] {
-
+  
+  def getUniquePrefixes: Set[String] = data.collect{ 
+    case (key,_) if key.startsWith(prefix) => separated.topLevelOnly(key,prefix)
+  }.toSet
+  
   def read(key: String): Either[Throwable, Option[Any]] = allCatch either { data get separated.wrap(key, prefix) }
 
   def forPrefix(key: String): ValueProvider[Map[String, Any]] = new MapValueReader(data, separated.wrap(key, prefix), separated)
