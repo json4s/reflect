@@ -12,6 +12,7 @@ trait ValueProvider[S]  {
   def forPrefix(key: String): ValueProvider[S]
   def values: S
   def keySet: Set[String]
+  def keyCount:Int = keySet.size
   def --(keys: Iterable[String]): ValueProvider[S]
   def isComplex(key: String): Boolean
   def contains(key: String): Boolean
